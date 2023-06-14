@@ -1,29 +1,82 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:toonflix/models/webtoon_detail_model.dart';
 import 'package:toonflix/models/webtoon_episode_model.dart';
 import 'package:toonflix/services/api_service.dart';
 import 'package:toonflix/widgets/episode_container_widget.dart';
 import 'package:toonflix/widgets/image_card_widget.dart';
 
-class DetailScreen extends StatelessWidget {
+class DetailScreen extends StatefulWidget {
   final String title, thumb, id;
 
   const DetailScreen(
       {super.key, required this.title, required this.thumb, required this.id});
 
   @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  late SharedPreferences prefs;
+  bool isFavorite = false;
+
+  Future initPrefs() async {
+    prefs = await SharedPreferences.getInstance();
+    final likedToons = prefs.getStringList('likedToons');
+    if (likedToons != null) {
+      if (likedToons.contains(widget.id) == true) {
+        setState(() {
+          isFavorite = true;
+        });
+      }
+    } else {
+      await prefs.setStringList('likedToons', []);
+    }
+  }
+
+  void onPressedFavorite() async {
+    final likedToons = prefs.getStringList('likedToons');
+    if (likedToons != null) {
+      if (isFavorite) {
+        likedToons.remove(widget.id);
+      } else {
+        likedToons.add(widget.id);
+      }
+      await prefs.setStringList('likedToons', likedToons);
+    }
+    setState(() {
+      isFavorite = !isFavorite;
+    });
+    print("clicked");
+    print(isFavorite);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    initPrefs();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final Future<WebtoonDetailModel> detail = ApiService.getDetail(id);
+    final Future<WebtoonDetailModel> detail = ApiService.getDetail(widget.id);
     final Future<List<WebtoonEpisodeModel>> episodes =
-        ApiService.getEpisodes(id);
+        ApiService.getEpisodes(widget.id);
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        actions: [
+          IconButton(
+              onPressed: onPressedFavorite,
+              icon: isFavorite
+                  ? const Icon(Icons.favorite_outlined)
+                  : const Icon(Icons.favorite_outline_outlined))
+        ],
         elevation: 0,
         title: Center(
           child: Text(
-            title,
+            widget.title,
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w400),
           ),
         ),
@@ -36,7 +89,7 @@ class DetailScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Hero(tag: id, child: ImageCard(thumb: thumb)),
+              Hero(tag: widget.id, child: ImageCard(thumb: widget.thumb)),
               const SizedBox(
                 height: 40,
               ),
@@ -78,7 +131,7 @@ class DetailScreen extends StatelessWidget {
                       children: [
                         for (var ep in eps!)
                           EpisodeContainer(
-                              title: ep.title, id: id, epNum: ep.id)
+                              title: ep.title, id: widget.id, epNum: ep.id)
                       ],
                     );
                   } else {
